@@ -43,12 +43,27 @@ jobs:
 
           echo "Previous market release date: $PREV_DATE"
 
-          BODY="# Market Release $TAG\n\n"
-          BODY+="## Highlights\n<!-- Edit before publishing -->\n\n"
+          OUT=aggregated.md
+          : > "$OUT"
+
+          {
+            echo "# Market Release $TAG"
+            echo
+            echo "## Highlights"
+            echo "<!-- Edit before publishing -->"
+            echo
+          } >> "$OUT"
+
+          # BODY="# Market Release $TAG\n\n"
+          # BODY+="## Highlights\n<!-- Edit before publishing -->\n\n"
 
           for REPO in "${REPOS[@]}"; do
             echo "Processing repository: $REPO"
-            BODY+="## ${REPO}\n\n"
+            # BODY+="## ${REPO}\n\n"
+              {
+            echo "## ${REPO}"
+            echo
+          } >> "$OUT"
 
             TAGS=$(gh release list \
               --repo "$ORG/$REPO" \
@@ -58,7 +73,9 @@ jobs:
             echo "Found tags for $REPO: $TAGS"
 
             if [ -z "$TAGS" ]; then
-              BODY+="_No releases_\n\n"
+              # BODY+="_No releases_\n\n"
+              echo "_No releases_" >> "$OUT"
+              echo >> "$OUT"
               continue
             fi
 
@@ -75,14 +92,19 @@ jobs:
                 --json body \
                 --jq '.body')
 
-              BODY+="### ${NAME}\n"
-              BODY+="${NOTES:-_No notes_}\n\n"
+              # BODY+="### ${NAME}\n"
+              # BODY+="${NOTES:-_No notes_}\n\n"
+              {
+                echo "### ${NAME}"
+                echo "${NOTES:-_No notes_}"
+                echo
+              } >> "$OUT"
             done
           done
 
-          echo "Aggregated release notes:\n$BODY"
+          # echo "Aggregated release notes:\n$BODY"
 
-          echo "$BODY" > aggregated.md
+          # echo "$BODY" > aggregated.md
 
           gh release create "$TAG" \
             --repo "$ORG/$TARGET_REPO" \
