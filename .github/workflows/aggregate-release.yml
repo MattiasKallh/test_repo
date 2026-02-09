@@ -47,6 +47,7 @@ jobs:
           BODY+="## Highlights\n<!-- Edit before publishing -->\n\n"
 
           for REPO in "${REPOS[@]}"; do
+            echo "Processing repository: $REPO"
             BODY+="## ${REPO}\n\n"
 
             TAGS=$(gh release list \
