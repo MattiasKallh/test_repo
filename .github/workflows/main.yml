@@ -1,0 +1,76 @@
+name: Aggregate Market Release Notes
+
+on:
+  release:
+    types: [created]
+
+permissions:
+  contents: write
+
+jobs:
+  aggregate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Aggregate release notes
+        env:
+          GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          ORG: your-org
+          TARGET_REPO: market-releases
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -e
+
+          echo "Aggregating release notes for $RELEASE_TAG"
+
+          # Repos to aggregate
+          REPOS=("test_repo_1")
+
+          # Get previous market release date
+          PREV_DATE=$(gh release list \
+            --repo "$ORG/$TARGET_REPO" \
+            --limit 2 \
+            --json tagName,publishedAt \
+            --jq '.[1].publishedAt')
+
+          if [ "$PREV_DATE" = "null" ] || [ -z "$PREV_DATE" ]; then
+            PREV_DATE="1970-01-01T00:00:00Z"
+          fi
+
+          echo "Previous release date: $PREV_DATE"
+
+          BODY="# Market Release $RELEASE_TAG\n\n"
+          BODY+="## Highlights\n<!-- Edit before publishing -->\n\n"
+
+          for REPO in "${REPOS[@]}"; do
+            BODY+="## ${REPO}\n"
+
+            RELEASES=$(gh release list \
+              --repo "$ORG/$REPO" \
+              --json tagName,name,publishedAt,body \
+              --jq ".[] | select(.publishedAt > \"$PREV_DATE\")")
+
+            if [ -z "$RELEASES" ]; then
+              BODY+="_No releases_\n\n"
+              continue
+            fi
+
+            echo "$RELEASES" | jq -r '
+              "### " + (.name // .tagName) + "\n" +
+              (.body // "_No notes_") + "\n"
+            ' >> /tmp/notes.md
+
+            BODY+=$(cat /tmp/notes.md)
+            BODY+="\n"
+            rm /tmp/notes.md
+          done
+
+          echo "$BODY" > aggregated.md
+
+          gh release edit "$RELEASE_TAG" \
+            --repo "$ORG/$TARGET_REPO" \
+            --draft \
+            --notes-file aggregated.md
