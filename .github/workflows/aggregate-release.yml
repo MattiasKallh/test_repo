@@ -55,6 +55,8 @@ jobs:
               --json tagName,publishedAt \
               --jq ".[] | select(.publishedAt > \"$PREV_DATE\") | .tagName")
 
+            echo "Found tags for $REPO: $TAGS"
+
             if [ -z "$TAGS" ]; then
               BODY+="_No releases_\n\n"
               continue
