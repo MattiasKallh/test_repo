@@ -19,8 +19,8 @@ jobs:
       - name: Create draft release with aggregated notes
         env:
           GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
-          ORG: your-org
-          TARGET_REPO: market-releases
+          ORG: mattiasKallh
+          TARGET_REPO: test_repo
           TAG: ${{ github.ref_name }}
         run: |
           set -e
