@@ -30,12 +30,18 @@ jobs:
           # Repos to aggregate
           REPOS=("test_repo_1")
 
-          # Get previous market release date
           PREV_DATE=$(gh release list \
             --repo "$ORG/$TARGET_REPO" \
-            --limit 1 \
-            --json publishedAt \
-            --jq '.[0].publishedAt')
+            --json publishedAt,isDraft \
+            --jq '
+              [ .[]
+                | select(.isDraft == false)
+                | select(.publishedAt != null)
+              ]
+              | sort_by(.publishedAt)
+              | last
+              | .publishedAt
+            ')
 
           if [ -z "$PREV_DATE" ] || [ "$PREV_DATE" = "null" ]; then
             PREV_DATE="1970-01-01T00:00:00Z"
@@ -54,16 +60,12 @@ jobs:
             echo
           } >> "$OUT"
 
-          # BODY="# Market Release $TAG\n\n"
-          # BODY+="## Highlights\n<!-- Edit before publishing -->\n\n"
-
           for REPO in "${REPOS[@]}"; do
             echo "Processing repository: $REPO"
-            # BODY+="## ${REPO}\n\n"
-              {
-            echo "## ${REPO}"
-            echo
-          } >> "$OUT"
+            {
+              echo "## ${REPO}"
+              echo
+            } >> "$OUT"
 
             TAGS=$(gh release list \
               --repo "$ORG/$REPO" \
@@ -73,7 +75,6 @@ jobs:
             echo "Found tags for $REPO: $TAGS"
 
             if [ -z "$TAGS" ]; then
-              # BODY+="_No releases_\n\n"
               echo "_No releases_" >> "$OUT"
               echo >> "$OUT"
               continue
@@ -91,9 +92,6 @@ jobs:
                 --repo "$ORG/$REPO" \
                 --json body \
                 --jq '.body')
-
-              # BODY+="### ${NAME}\n"
-              # BODY+="${NOTES:-_No notes_}\n\n"
               {
                 echo "### ${NAME}"
                 echo "${NOTES:-_No notes_}"
@@ -101,10 +99,6 @@ jobs:
               } >> "$OUT"
             done
           done
-
-          # echo "Aggregated release notes:\n$BODY"
-
-          # echo "$BODY" > aggregated.md
 
           gh release create "$TAG" \
             --repo "$ORG/$TARGET_REPO" \
