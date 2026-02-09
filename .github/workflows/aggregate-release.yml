@@ -27,7 +27,7 @@ jobs:
           echo "Aggregating release notes for $RELEASE_TAG"
 
           # Repos to aggregate
-          REPOS=("repo-backend" "repo-web")
+          REPOS=("test_repo_1")
 
           # Get previous market release date
           PREV_DATE=$(gh release list \
