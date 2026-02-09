@@ -1,8 +1,9 @@
-name: Aggregate Market Release Notes
+name: Create Draft Market Release from Tag
 
 on:
-  release:
-    types: [created]
+  push:
+    tags:
+      - '*'
 
 permissions:
   contents: write
@@ -15,34 +16,34 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Aggregate release notes
+      - name: Create draft release with aggregated notes
         env:
           GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
           ORG: your-org
           TARGET_REPO: market-releases
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          TAG: ${{ github.ref_name }}
         run: |
           set -e
 
-          echo "Aggregating release notes for $RELEASE_TAG"
+          echo "Creating draft market release for tag: $TAG"
 
           # Repos to aggregate
           REPOS=("test_repo_1")
 
-          # Get previous market release date
+          # Get previous market release date (excluding this tag)
           PREV_DATE=$(gh release list \
             --repo "$ORG/$TARGET_REPO" \
-            --limit 2 \
-            --json tagName,publishedAt \
-            --jq '.[1].publishedAt')
+            --limit 1 \
+            --json publishedAt \
+            --jq '.[0].publishedAt')
 
           if [ "$PREV_DATE" = "null" ] || [ -z "$PREV_DATE" ]; then
             PREV_DATE="1970-01-01T00:00:00Z"
           fi
 
-          echo "Previous release date: $PREV_DATE"
+          echo "Previous market release date: $PREV_DATE"
 
-          BODY="# Market Release $RELEASE_TAG\n\n"
+          BODY="# Market Release $TAG\n\n"
           BODY+="## Highlights\n<!-- Edit before publishing -->\n\n"
 
           for REPO in "${REPOS[@]}"; do
@@ -50,7 +51,7 @@ jobs:
 
             RELEASES=$(gh release list \
               --repo "$ORG/$REPO" \
-              --json tagName,name,publishedAt,body \
+              --json name,tagName,publishedAt,body \
               --jq ".[] | select(.publishedAt > \"$PREV_DATE\")")
 
             if [ -z "$RELEASES" ]; then
@@ -70,7 +71,9 @@ jobs:
 
           echo "$BODY" > aggregated.md
 
-          gh release edit "$RELEASE_TAG" \
+          # Create draft release
+          gh release create "$TAG" \
             --repo "$ORG/$TARGET_REPO" \
+            --title "$TAG" \
             --draft \
             --notes-file aggregated.md
