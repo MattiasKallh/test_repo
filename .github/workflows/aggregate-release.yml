@@ -16,7 +16,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Create draft release with aggregated notes
+      - name: Create draft release with aggregated notes + docs
         env:
           GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
           ORG: mattiasKallh
@@ -27,7 +27,6 @@ jobs:
 
           echo "Creating draft market release for tag: $TAG"
 
-          # Repos to aggregate
           REPOS=("test_repo_1")
 
           PREV_DATE=$(gh release list \
@@ -52,6 +51,9 @@ jobs:
           OUT=aggregated.md
           : > "$OUT"
 
+          DOC_ROOT=market-docs
+          mkdir -p "$DOC_ROOT"
+
           {
             echo "# Market Release $TAG"
             echo
@@ -62,6 +64,7 @@ jobs:
 
           for REPO in "${REPOS[@]}"; do
             echo "Processing repository: $REPO"
+
             {
               echo "## ${REPO}"
               echo
@@ -72,17 +75,14 @@ jobs:
               --json tagName,publishedAt \
               --jq ".[] | select(.publishedAt > \"$PREV_DATE\") | .tagName")
 
-            echo "Found tags for $REPO: $TAGS"
-
             if [ -z "$TAGS" ]; then
               echo "_No releases_" >> "$OUT"
               echo >> "$OUT"
               continue
             fi
 
-            echo "Aggregating notes for tags: $TAGS"
-
             for SUBTAG in $TAGS; do
+              echo "Handling $REPO $SUBTAG"
               NAME=$(gh release view "$SUBTAG" \
                 --repo "$ORG/$REPO" \
                 --json name \
@@ -98,10 +98,48 @@ jobs:
                 echo
               } >> "$OUT"
             done
+
+            # ---- DOC DOWNLOAD ----
+            LATEST_TAG=$(echo "$TAGS" | head -n 1)
+            echo "Latest tag for docs: $LATEST_TAG"
+
+            ASSET=$(gh release view "$LATEST_TAG" \
+              --repo "$ORG/$REPO" \
+              --json assets \
+              --jq '.assets[] | select(.name | startswith("docs-")) | .name' \
+              | head -n 1)
+
+            if [ -n "$ASSET" ]; then
+              echo "Downloading docs asset $ASSET"
+
+              mkdir -p "$DOC_ROOT/$REPO"
+
+              gh release download "$LATEST_TAG" \
+                --repo "$ORG/$REPO" \
+                --pattern "$ASSET" \
+                --dir "$DOC_ROOT/$REPO"
+
+              unzip -q "$DOC_ROOT/$REPO/$ASSET" \
+                -d "$DOC_ROOT/$REPO"
+
+              rm "$DOC_ROOT/$REPO/$ASSET"
+            else
+              echo "No docs asset found for $REPO"
+            fi
+            # ---- END DOC DOWNLOAD ----
           done
 
+          echo "Creating draft release..."
           gh release create "$TAG" \
             --repo "$ORG/$TARGET_REPO" \
             --title "$TAG" \
             --draft \
             --notes-file aggregated.md
+
+          echo "Zipping merged docs..."
+          zip -r market-docs-$TAG.zip "$DOC_ROOT"
+
+          echo "Uploading docs to draft release..."
+          gh release upload "$TAG" \
+            market-docs-$TAG.zip \
+            --repo "$ORG/$TARGET_REPO"
