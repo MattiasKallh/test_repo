@@ -1,8 +1,11 @@
 ---
-# Feel free to add content and custom Front Matter to this file.
-# To modify the layout, see https://jekyllrb.com/docs/themes/#overriding-theme-defaults
-
-# layout: home
-- [Latest Docs](docs/)
-- [Releases](releases/)
+layout: default
+title: Home
 ---
+
+Welcome to **{{ site.title }}**!
+
+This site contains:
+
+- [Release Notes](/releases.html)
+- [Documentation](/docs/index.html)
