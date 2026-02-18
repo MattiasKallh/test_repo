@@ -1,11 +1,11 @@
 ---
-layout: default
-title: Home
+# layout: default
+# title: Home
 ---
 
 Welcome to **{{ site.title }}**!
 
-This site contains:
 
-- [Release Notes](/releases.md)
-- [Documentation](/docs/index.md)
+- [Latest Docs](docs/)
+- [Release Notes](releases/)
+---
