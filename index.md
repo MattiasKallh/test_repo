@@ -1,7 +1,7 @@
 ---
 layout: home
 # title: Home
-
-- [Latest Docs](docs/)
-- [Release Notes](releases/)
 ---
+
+- [Latest Documentation](docs/docs.md)
+- [Release Notes](releases/releases.md)

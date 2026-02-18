@@ -31,9 +31,28 @@ baseurl: "" # the subpath of your site, e.g. /blog
 # github_username:  jekyll
 
 # Build settings
-theme: minima
-plugins:
-  - jekyll-feed
+# theme: minima
+theme: just-the-docs
+# plugins:
+#   - jekyll-feed
+
+defaults:
+  - scope:
+      path: "docs"
+      type: "pages"
+    values:
+      layout: "default"
+
+# nav:
+#   - title: "Documentation"
+#     nav_link: "/docs/"
+#   - title: "Releases"
+#     nav_link: "/releases/"
+
+nav_collapsible: true
+
+
+
 
 # Exclude from processing.
 # The following items will not be processed, by default.
