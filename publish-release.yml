@@ -1,0 +1,75 @@
+name: Publish Release Notes and Docs to Pages
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@v4
+        with:
+          ref: release
+        continue-on-error: true
+
+      - name: Create branch if missing
+        run: |
+          git checkout release || git checkout -b release
+
+      - name: Prepare folders
+        run: |
+          mkdir -p releases
+          rm -rf docs
+          mkdir -p docs
+
+      - name: Write release notes
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          BODY: ${{ github.event.release.body }}
+        run: |
+          FILE="releases/${TAG}.md"
+          echo "# Release ${TAG}" > "$FILE"
+          echo "" >> "$FILE"
+          echo "$BODY" >> "$FILE"
+
+      - name: Get asset download URL
+        id: asset
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          ASSETS_JSON: ${{ toJson(github.event.release.assets) }}
+        run: |
+          echo "$ASSETS_JSON" > assets.json
+          URL=$(jq -r ".[] | select(.name == \"market-docs-${TAG}.zip\") | .browser_download_url" assets.json)
+          echo "url=$URL" >> $GITHUB_OUTPUT
+
+      - name: Download release docs
+        if: steps.asset.outputs.url != ''
+        run: |
+          curl -L "${{ steps.asset.outputs.url }}" -o docs.zip
+
+      - name: Extract docs
+        if: steps.asset.outputs.url != ''
+        run: |
+          unzip docs.zip -d extracted-docs
+
+      - name: Publish docs
+        if: steps.asset.outputs.url != ''
+        run: |
+          cp -r extracted-docs/* docs/
+
+      # -------------------------
+      # COMMIT
+      # -------------------------
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add releases docs
+          git commit -m "Publish release ${{ github.event.release.tag_name }}" || echo "No changes"
+          git push origin release

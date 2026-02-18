@@ -18,16 +18,17 @@ jobs:
 
       - name: Create draft release with aggregated notes + docs
         env:
-          GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
           ORG: mattiasKallh
           TARGET_REPO: test_repo
+          SOURCE_REPOS: test_repo_1 test_repo_2
+          GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: |
           set -e
 
           echo "Creating draft market release for tag: $TAG"
 
-          REPOS=("test_repo_1")
+          REPOS=($SOURCE_REPOS)
 
           PREV_DATE=$(gh release list \
             --repo "$ORG/$TARGET_REPO" \
