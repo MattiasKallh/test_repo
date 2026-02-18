@@ -1,5 +1,5 @@
 ---
-# layout: default
+layout: home
 # title: Home
 
 - [Latest Docs](docs/)
