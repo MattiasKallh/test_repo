@@ -7,5 +7,5 @@ Welcome to **{{ site.title }}**!
 
 This site contains:
 
-- [Release Notes](/releases.html)
-- [Documentation](/docs/index.html)
+- [Release Notes](/releases.md)
+- [Documentation](/docs/index.md)
