@@ -58,10 +58,69 @@ jobs:
         run: |
           unzip docs.zip -d extracted-docs
 
-      - name: Publish docs
+      - name: Clean empty folders and move up subfolders
         if: steps.asset.outputs.url != ''
         run: |
+          function move_up() {
+            for dir in "$1"/*; do
+              if [ -d "$dir" ]; then
+                move_up "$dir"
+                # If directory is empty except for other directories, move subfolders up
+                if [ -z "$(find "$dir" -maxdepth 1 -type f)" ]; then
+                  for sub in "$dir"/*; do
+                    mv "$sub" "$dir/../"
+                  done
+                  rmdir "$dir"
+                fi
+              fi
+            done
+          }
+          move_up extracted-docs
           cp -r extracted-docs/* docs/
+
+      - name: Add frontmatter to files
+        if: steps.asset.outputs.url != ''
+        run: |
+          shopt -s globstar nullglob
+          for file in docs/**/*.md; do
+            folder=$(basename "$(dirname "$file")")
+            parent_folder=$(basename "$(dirname "$(dirname "$file")")")
+            folder_title=$(echo "$folder" | sed -E 's/[-_]/ /g' | awk '{for(i=1;i<=NF;i++){ $i=toupper(substr($i,1,1)) substr($i,2) } print}')
+            parent_title=$(echo "$parent_folder" | sed -E 's/[-_]/ /g' | awk '{for(i=1;i<=NF;i++){ $i=toupper(substr($i,1,1)) substr($i,2) } print}')
+            base_name=$(basename "$file" .md)
+            file_title=$(echo "$base_name" | sed -E 's/[-_]/ /g' | awk '{for(i=1;i<=NF;i++){ $i=toupper(substr($i,1,1)) substr($i,2) } print}')
+            
+            # Check for folder-level markdown
+            folder_md=""
+            for candidate in folder-name.md readme.md doc.md; do
+              for match in $(ls -1 "$(dirname "$file")" | grep -i "^${candidate//-/_}$"); do
+                folder_md="$match"
+                break 2
+              done
+            done
+
+            if [ -n "$folder_md" ]; then
+              cat > temp.md <<EOF
+              ---
+              layout: default
+              title: $folder_title
+              parent: $parent_title
+              ---
+              EOF
+              cat "$file" >> temp.md
+              mv temp.md "$file"
+            else
+              cat > temp.md <<EOF
+              ---
+              layout: default
+              title: $file_title
+              parent: $parent_title
+              ---
+              EOF
+              cat "$file" >> temp.md
+              mv temp.md "$file"
+            fi
+          done
 
       # -------------------------
       # COMMIT
