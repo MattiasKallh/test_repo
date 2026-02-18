@@ -32,7 +32,6 @@ baseurl: "" # the subpath of your site, e.g. /blog
 
 # Build settings
 theme: minima
-markdown: kramdown
 plugins:
   - jekyll-feed
 
