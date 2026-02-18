@@ -20,7 +20,7 @@ jobs:
         env:
           ORG: mattiasKallh
           TARGET_REPO: test_repo
-          SOURCE_REPOS: test_repo_1 test_repo_2
+          SOURCE_REPOS: test_repo_1
           GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: |
