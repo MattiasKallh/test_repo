@@ -52,8 +52,8 @@ jobs:
           OUT=aggregated.md
           : > "$OUT"
 
-          DOC_ROOT=market-docs
-          mkdir -p "$DOC_ROOT"
+          # DOC_ROOT=market-docs
+          # mkdir -p "$DOC_ROOT"
 
           {
             echo "# Market Release $TAG"
@@ -115,15 +115,25 @@ jobs:
 
               mkdir -p "$DOC_ROOT/$REPO"
 
+              # gh release download "$LATEST_TAG" \
+              #   --repo "$ORG/$REPO" \
+              #   --pattern "$ASSET" \
+              #   --dir "$DOC_ROOT/$REPO"
+
+              # unzip -q "$DOC_ROOT/$REPO/$ASSET" \
+              #   -d "$DOC_ROOT/$REPO"
+
+              # rm "$DOC_ROOT/$REPO/$ASSET"
+
+              mkdir -p "$REPO"
               gh release download "$LATEST_TAG" \
                 --repo "$ORG/$REPO" \
                 --pattern "$ASSET" \
-                --dir "$DOC_ROOT/$REPO"
+                --dir "$REPO"
+              unzip -q "$REPO/$ASSET" \
+                -d "$REPO"
+              rm "$REPO/$ASSET"
 
-              unzip -q "$DOC_ROOT/$REPO/$ASSET" \
-                -d "$DOC_ROOT/$REPO"
-
-              rm "$DOC_ROOT/$REPO/$ASSET"
             else
               echo "No docs asset found for $REPO"
             fi
@@ -138,7 +148,8 @@ jobs:
             --notes-file aggregated.md
 
           echo "Zipping merged docs..."
-          zip -r market-docs-$TAG.zip "$DOC_ROOT"
+          # zip -r market-docs-$TAG.zip "$DOC_ROOT"
+          zip -r market-docs-$TAG.zip "${REPOS[@]}"
 
           echo "Uploading docs to draft release..."
           gh release upload "$TAG" \
