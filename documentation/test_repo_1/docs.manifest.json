@@ -1,0 +1,33 @@
+{
+  "navigation": [
+    {
+      "id": "test_repo_1",
+      "title": "Test Repo 1",
+      "file": "README.md",
+      "children": [
+        {
+          "id": "doc",
+          "title": "General Documentation",
+          "file": "doc/generic_doc.md"
+        },
+        {
+          "id": "service_1",
+          "title": "Service 1",
+          "file": "service_1/doc/doc.md",
+          "children": [
+            {
+              "id": "service_1_more_docs",
+              "title": "Some more documentation",
+              "file": "service_1/doc/more_doc.md"
+            }
+          ]
+        },
+        {
+          "id": "service_2",
+          "title": "Service 2",
+          "file": "service_2/doc/doc.md"
+        }
+      ]
+    }
+  ]
+}
