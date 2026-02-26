@@ -157,16 +157,16 @@ jobs:
 
             jq -c '
             def walk_nodes(parent):
-              if type == "object" then
-                {
-                  file: .file,
-                  title: .title,
+              . as $node
+              | {
+                  file: $node.file,
+                  title: $node.title,
                   parent: parent
                 },
-                (.children // [] | .[] | walk_nodes(.title))
-              else
-                empty
-              end;
+                (
+                  $node.children[]?
+                  | walk_nodes($node.title)
+                );
 
             .navigation[] | walk_nodes("Documentation")
             ' "$MANIFEST" | while read NODE; do
