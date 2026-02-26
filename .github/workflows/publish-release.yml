@@ -136,13 +136,8 @@ jobs:
           for file in docs/**/*.md; do
             base_name=$(basename "$file" .md)
             title=$(echo "$base_name" | sed -E 's/[-_]/ /g' | awk '{for(i=1;i<=NF;i++){$i=toupper(substr($i,1,1)) substr($i,2)};print}')
-            
-cat > temp.md <<EOF
----
-layout: default
-title: ${title}
----
-EOF
+
+            printf -- "---\nlayout: default\ntitle: %s\n---\n" "$title" > temp.md
             cat "$file" >> temp.md
             mv temp.md "$file"
           done
