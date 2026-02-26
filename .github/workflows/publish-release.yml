@@ -41,8 +41,8 @@ jobs:
         run: |
           set -e
           mkdir -p releases
-          rm -rf docs
-          mkdir -p docs
+          rm -rf documentation
+          mkdir -p documentation
 
       # -------------------------
       # WRITE RELEASE NOTES
@@ -54,9 +54,22 @@ jobs:
         run: |
           set -e
           FILE="releases/${TAG}.md"
-          echo "# Release ${TAG}" > "$FILE"
-          echo "" >> "$FILE"
-          echo "$BODY" >> "$FILE"
+
+          # Count existing release files (before adding this one)
+          COUNT=$(ls releases 2>/dev/null | wc -l || echo 0)
+
+          {
+            echo "---"
+            echo "layout: default"
+            echo "title: $TAG"
+            echo "parent: Releases"
+            echo "nav_order: -$((COUNT+1))"
+            echo "---"
+            echo
+            echo "# Release ${TAG}"
+            echo
+            echo "$BODY"
+          } > "$FILE"
 
       # -------------------------
       # GET ASSET DOWNLOAD URL
@@ -91,56 +104,7 @@ jobs:
         run: |
           set -e
           unzip -q docs.zip -d extracted-docs
-
-      # -------------------------
-      # CLEAN EMPTY FOLDERS (FOLDER-FLATENING)
-      # -------------------------
-      - name: Flatten empty folders
-        if: steps.asset.outputs.url != ''
-        run: |
-          set -e
-          shopt -s dotglob
-
-          while true; do
-            dirs=$(find extracted-docs -type d -mindepth 1 -exec bash -c '
-              for d; do
-                files=$(find "$d" -maxdepth 1 -type f | wc -l)
-                subdirs=$(find "$d" -mindepth 1 -maxdepth 1 -type d | wc -l)
-                if [ "$files" -eq 0 ] && [ "$subdirs" -gt 0 ]; then
-                  echo "$d"
-                fi
-              done
-            ' bash {} +)
-
-            [ -z "$dirs" ] && break
-
-            for d in $dirs; do
-              for sub in "$d"/*; do
-                mv "$sub" "$(dirname "$d")/"
-              done
-              rmdir "$d"
-            done
-          done
-
-          cp -r extracted-docs/* docs/
-
-      # -------------------------
-      # ADD FRONTMATTER
-      # -------------------------
-      - name: Add frontmatter to markdown files
-        if: steps.asset.outputs.url != ''
-        run: |
-          set -e
-          shopt -s globstar nullglob
-
-          for file in docs/**/*.md; do
-            base_name=$(basename "$file" .md)
-            title=$(echo "$base_name" | sed -E 's/[-_]/ /g' | awk '{for(i=1;i<=NF;i++){$i=toupper(substr($i,1,1)) substr($i,2)};print}')
-
-            printf -- "---\nlayout: default\ntitle: %s\n---\n" "$title" > temp.md
-            cat "$file" >> temp.md
-            mv temp.md "$file"
-          done
+          cp -r extracted-docs/* documentation/
 
       # -------------------------
       # COMMIT + PUSH
@@ -151,10 +115,11 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
-          git add releases docs
+          git add releases documentation
 
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
             git commit -m "Publish release ${{ github.event.release.tag_name }}"
             git push origin release
+          fi
