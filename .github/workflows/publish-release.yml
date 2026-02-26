@@ -41,8 +41,9 @@ jobs:
         run: |
           set -e
           mkdir -p releases
-          rm -rf documentation
           mkdir -p documentation
+          # Remove everything in /documentation except documentation.md
+          find documentation -mindepth 1 ! -name "documentation.md" -delete
 
       # -------------------------
       # WRITE RELEASE NOTES
