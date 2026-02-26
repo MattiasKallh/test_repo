@@ -16,6 +16,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y yq jq unzip
+
       - name: Create draft release with aggregated notes + docs
         env:
           ORG: mattiasKallh
@@ -50,8 +55,6 @@ jobs:
             PREV_DATE="1970-01-01T00:00:00Z"
           fi
 
-          echo "Previous market release date: $PREV_DATE"
-
           OUT=aggregated.md
           : > "$OUT"
 
@@ -66,10 +69,8 @@ jobs:
           for REPO in "${REPOS[@]}"; do
             echo "Processing repository: $REPO"
 
-            {
-              echo "## ${REPO}"
-              echo
-            } >> "$OUT"
+            echo "## ${REPO}" >> "$OUT"
+            echo >> "$OUT"
 
             TAGS=$(gh release list \
               --repo "$ORG/$REPO" \
@@ -83,8 +84,6 @@ jobs:
             fi
 
             for SUBTAG in $TAGS; do
-              echo "Handling $REPO $SUBTAG"
-
               NAME=$(gh release view "$SUBTAG" \
                 --repo "$ORG/$REPO" \
                 --json name,tagName \
@@ -104,7 +103,6 @@ jobs:
 
             # ---- DOC DOWNLOAD ----
             LATEST_TAG=$(echo "$TAGS" | head -n 1)
-            echo "Latest tag for docs: $LATEST_TAG"
 
             ASSET=$(gh release view "$LATEST_TAG" \
               --repo "$ORG/$REPO" \
@@ -113,8 +111,6 @@ jobs:
               | head -n 1)
 
             if [ -n "$ASSET" ]; then
-              echo "Downloading docs asset $ASSET"
-
               mkdir -p "./$REPO"
 
               gh release download "$LATEST_TAG" \
@@ -125,17 +121,56 @@ jobs:
               unzip -q "./$REPO/$ASSET" -d "./$REPO"
               rm "./$REPO/$ASSET"
 
+              MANIFEST="./$REPO/docs.manifest.yaml"
+
+              if [ -f "$MANIFEST" ]; then
+                echo "Injecting metadata using manifest..."
+
+                yq -r '
+                  def walk_nodes(parent):
+                    .[] |
+                    {
+                      file: .file,
+                      title: .title,
+                      parent: parent
+                    },
+                    (if .children then .children | walk_nodes(.title) else empty end);
+
+                  .navigation | walk_nodes("Documentation")
+                ' "$MANIFEST" | jq -c '.' | while read NODE; do
+
+                  FILE=$(echo "$NODE" | jq -r '.file')
+                  TITLE=$(echo "$NODE" | jq -r '.title')
+                  PARENT=$(echo "$NODE" | jq -r '.parent')
+
+                  TARGET_FILE="./$REPO/$FILE"
+
+                  if [ -f "$TARGET_FILE" ]; then
+                    echo "Processing $TARGET_FILE"
+
+                    TMP=$(mktemp)
+
+                    {
+                      echo "---"
+                      echo "layout: default"
+                      echo "title: $TITLE"
+                      echo "parent: $PARENT"
+                      echo "---"
+                      echo
+                      cat "$TARGET_FILE"
+                    } > "$TMP"
+
+                    mv "$TMP" "$TARGET_FILE"
+                  fi
+                done
+              fi
+
               DOC_REPOS+=("$REPO")
-            else
-              echo "No docs asset found for $REPO"
             fi
-            # ---- END DOC DOWNLOAD ----
           done
 
-          echo "Creating draft release..."
-
           if gh release view "$TAG" --repo "$ORG/$TARGET_REPO" >/dev/null 2>&1; then
-            echo "Release $TAG already exists — skipping create."
+            echo "Release $TAG already exists"
           else
             gh release create "$TAG" \
               --repo "$ORG/$TARGET_REPO" \
@@ -144,18 +179,12 @@ jobs:
               --notes-file aggregated.md
           fi
 
-          # Zip only repos that actually had docs
           if [ ${#DOC_REPOS[@]} -gt 0 ]; then
-            echo "Zipping merged docs..."
             zip -r market-docs-$TAG.zip "${DOC_REPOS[@]}"
-
-            echo "Uploading docs to draft release..."
             gh release upload "$TAG" \
               market-docs-$TAG.zip \
               --repo "$ORG/$TARGET_REPO" \
               --clobber
-          else
-            echo "No documentation downloaded — skipping zip upload."
           fi
 
           echo "Done."
