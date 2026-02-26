@@ -36,12 +36,12 @@ theme: just-the-docs
 # plugins:
 #   - jekyll-feed
 
-defaults:
-  - scope:
-      path: "docs"
-      type: "pages"
-    values:
-      layout: "default"
+# defaults:
+#   - scope:
+#       path: "docs"
+#       type: "pages"
+#     values:
+#       layout: "default"
 
 # nav:
 #   - title: "Documentation"
