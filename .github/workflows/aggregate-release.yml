@@ -126,15 +126,23 @@ jobs:
               if [ -f "$MANIFEST" ]; then
                 echo "Injecting metadata using manifest..."
 
-                yq -r '
+                yq -o=json '
                   def walk_nodes(parent):
-                    .[] |
-                    {
-                      file: .file,
-                      title: .title,
-                      parent: parent
-                    },
-                    (if .children then .children | walk_nodes(.title) else empty end);
+                    .[] as $node |
+                    (
+                      {
+                        file: $node.file,
+                        title: $node.title,
+                        parent: parent
+                      }
+                    ),
+                    (
+                      if $node.children then
+                        $node.children | walk_nodes($node.title)
+                      else
+                        empty
+                      end
+                    );
 
                   .navigation | walk_nodes("Documentation")
                 ' "$MANIFEST" | jq -c '.' | while read NODE; do
