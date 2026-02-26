@@ -19,9 +19,12 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y yq jq unzip
+          sudo apt-get install -y jq unzip
 
-      - name: Create draft release with aggregated notes + docs
+      # --------------------------------------
+      # Create Release + Aggregate Docs
+      # --------------------------------------
+      - name: Create draft release
         env:
           ORG: mattiasKallh
           TARGET_REPO: test_repo
@@ -29,7 +32,8 @@ jobs:
           GH_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: |
-          set -e
+          set -euo pipefail
+
           cd "$GITHUB_WORKSPACE"
 
           echo "Creating draft market release for tag: $TAG"
@@ -37,7 +41,9 @@ jobs:
           REPOS=($SOURCE_REPOS)
           DOC_REPOS=()
 
-          # Get previous published (non-draft) release date
+          # --------------------------------------
+          # Previous release cutoff
+          # --------------------------------------
           PREV_DATE=$(gh release list \
             --repo "$ORG/$TARGET_REPO" \
             --json publishedAt,isDraft \
@@ -66,6 +72,9 @@ jobs:
             echo
           } >> "$OUT"
 
+          # --------------------------------------
+          # Process source repositories
+          # --------------------------------------
           for REPO in "${REPOS[@]}"; do
             echo "Processing repository: $REPO"
 
@@ -83,7 +92,11 @@ jobs:
               continue
             fi
 
+            # --------------------------------------
+            # Aggregate release notes
+            # --------------------------------------
             for SUBTAG in $TAGS; do
+
               NAME=$(gh release view "$SUBTAG" \
                 --repo "$ORG/$REPO" \
                 --json name,tagName \
@@ -99,9 +112,12 @@ jobs:
                 echo "${NOTES:-_No notes_}"
                 echo
               } >> "$OUT"
+
             done
 
-            # ---- DOC DOWNLOAD ----
+            # --------------------------------------
+            # Documentation asset download
+            # --------------------------------------
             LATEST_TAG=$(echo "$TAGS" | head -n 1)
 
             ASSET=$(gh release view "$LATEST_TAG" \
@@ -110,75 +126,93 @@ jobs:
               --jq '.assets[] | select(.name | startswith("docs-")) | .name' \
               | head -n 1)
 
-            if [ -n "$ASSET" ]; then
-              mkdir -p "./$REPO"
+            if [ -z "$ASSET" ]; then
+              echo "No docs asset found for $REPO"
+              continue
+            fi
 
-              gh release download "$LATEST_TAG" \
-                --repo "$ORG/$REPO" \
-                --pattern "$ASSET" \
-                --dir "./$REPO"
+            mkdir -p "./$REPO"
 
-              unzip -q "./$REPO/$ASSET" -d "./$REPO"
-              rm "./$REPO/$ASSET"
+            gh release download "$LATEST_TAG" \
+              --repo "$ORG/$REPO" \
+              --pattern "$ASSET" \
+              --dir "./$REPO"
 
-              MANIFEST="./$REPO/docs.manifest.yaml"
+            unzip -q "./$REPO/$ASSET" -d "./$REPO"
+            rm "./$REPO/$ASSET"
 
-              if [ -f "$MANIFEST" ]; then
-                echo "Injecting metadata using manifest..."
+            DOC_REPOS+=("$REPO")
 
-                yq -o=json '
-                  def walk_nodes(parent):
-                    .[] as $node |
-                    (
-                      {
-                        file: $node.file,
-                        title: $node.title,
-                        parent: parent
-                      }
-                    ),
-                    (
-                      if $node.children then
-                        $node.children | walk_nodes($node.title)
-                      else
-                        empty
-                      end
-                    );
+            # --------------------------------------
+            # Metadata injection using JSON manifest
+            # --------------------------------------
+            MANIFEST="./$REPO/docs.manifest.json"
 
-                  .navigation | walk_nodes("Documentation")
-                ' "$MANIFEST" | jq -c '.' | while read NODE; do
+            if [ ! -f "$MANIFEST" ]; then
+              echo "Manifest not found for $REPO"
+              continue
+            fi
 
-                  FILE=$(echo "$NODE" | jq -r '.file')
-                  TITLE=$(echo "$NODE" | jq -r '.title')
-                  PARENT=$(echo "$NODE" | jq -r '.parent')
+            echo "Injecting documentation metadata..."
 
-                  TARGET_FILE="./$REPO/$FILE"
+            jq -c '
+              def walk_nodes(parent):
+                .[] |
+                {
+                  file: .file,
+                  title: .title,
+                  parent: parent
+                },
+                (if .children then .children | walk_nodes(.title) else empty end);
 
-                  if [ -f "$TARGET_FILE" ]; then
-                    echo "Processing $TARGET_FILE"
+              .navigation | walk_nodes("Documentation")
+            ' "$MANIFEST" | while read NODE; do
 
-                    TMP=$(mktemp)
+              FILE=$(echo "$NODE" | jq -r '.file')
+              TITLE=$(echo "$NODE" | jq -r '.title')
+              PARENT=$(echo "$NODE" | jq -r '.parent')
 
-                    {
-                      echo "---"
-                      echo "layout: default"
-                      echo "title: $TITLE"
-                      echo "parent: $PARENT"
-                      echo "---"
-                      echo
-                      cat "$TARGET_FILE"
-                    } > "$TMP"
+              TARGET_FILE="./$REPO/$FILE"
 
-                    mv "$TMP" "$TARGET_FILE"
-                  fi
-                done
+              if [ ! -f "$TARGET_FILE" ]; then
+                echo "Warning: $TARGET_FILE not found"
+                continue
               fi
 
-              DOC_REPOS+=("$REPO")
-            fi
+              echo "Processing $TARGET_FILE"
+
+              TMP=$(mktemp)
+
+              # Remove existing frontmatter
+              awk '
+                BEGIN { in_frontmatter=0 }
+                NR==1 && $0=="---" { in_frontmatter=1; next }
+                in_frontmatter && $0=="---" { in_frontmatter=0; next }
+                !in_frontmatter { print }
+              ' "$TARGET_FILE" > "$TMP.content"
+
+              {
+                echo "---"
+                echo "layout: default"
+                echo "title: $TITLE"
+                echo "parent: $PARENT"
+                echo "---"
+                echo
+                cat "$TMP.content"
+              } > "$TMP"
+
+              mv "$TMP" "$TARGET_FILE"
+              rm "$TMP.content"
+
+            done
+
           done
 
+          # --------------------------------------
+          # Create market release
+          # --------------------------------------
           if gh release view "$TAG" --repo "$ORG/$TARGET_REPO" >/dev/null 2>&1; then
-            echo "Release $TAG already exists"
+            echo "Release already exists"
           else
             gh release create "$TAG" \
               --repo "$ORG/$TARGET_REPO" \
@@ -187,10 +221,14 @@ jobs:
               --notes-file aggregated.md
           fi
 
+          # --------------------------------------
+          # Upload merged docs
+          # --------------------------------------
           if [ ${#DOC_REPOS[@]} -gt 0 ]; then
-            zip -r market-docs-$TAG.zip "${DOC_REPOS[@]}"
+            zip -r "market-docs-$TAG.zip" "${DOC_REPOS[@]}"
+
             gh release upload "$TAG" \
-              market-docs-$TAG.zip \
+              "market-docs-$TAG.zip" \
               --repo "$ORG/$TARGET_REPO" \
               --clobber
           fi
