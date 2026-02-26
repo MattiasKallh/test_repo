@@ -161,7 +161,8 @@ jobs:
               | {
                   file: $node.file,
                   title: $node.title,
-                  parent: parent
+                  parent: parent,
+                  nav_order: ($node["nav-order"] // "")
                 },
                 (
                   $node.children[]?
@@ -174,6 +175,7 @@ jobs:
               FILE=$(echo "$NODE" | jq -r '.file')
               TITLE=$(echo "$NODE" | jq -r '.title')
               PARENT=$(echo "$NODE" | jq -r '.parent')
+              NAV_ORDER=$(echo "$NODE" | jq -r '.nav_order')
 
               TARGET_FILE="./$REPO/$FILE"
 
@@ -199,6 +201,9 @@ jobs:
                 echo "layout: default"
                 echo "title: $TITLE"
                 echo "parent: $PARENT"
+                if [ -n "$NAV_ORDER" ]; then
+                  echo "nav_order: $NAV_ORDER"
+                fi
                 echo "---"
                 echo
                 cat "$TMP.content"
