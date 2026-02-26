@@ -8,12 +8,14 @@
         {
           "id": "doc",
           "title": "General Documentation",
-          "file": "doc/generic_doc.md"
+          "file": "doc/generic_doc.md",
+          "nav-order": 1
         },
         {
           "id": "service_1",
           "title": "Service 1",
           "file": "service_1/doc/doc.md",
+          "nav-order": 2,
           "children": [
             {
               "id": "service_1_more_docs",
@@ -25,7 +27,8 @@
         {
           "id": "service_2",
           "title": "Service 2",
-          "file": "service_2/doc/doc.md"
+          "file": "service_2/doc/doc.md",
+          "nav-order": 3
         }
       ]
     }

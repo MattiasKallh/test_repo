@@ -2,6 +2,7 @@
 layout: default
 title: General Documentation
 parent: Test Repo 1
+nav_order: 1
 ---
 
 This is some documentation.
