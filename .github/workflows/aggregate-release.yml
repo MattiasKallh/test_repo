@@ -156,16 +156,19 @@ jobs:
             echo "Injecting documentation metadata..."
 
             jq -c '
-              def walk_nodes(parent):
-                .[] |
+            def walk_nodes(parent):
+              if type == "object" then
                 {
                   file: .file,
                   title: .title,
                   parent: parent
                 },
-                (if .children then .children | walk_nodes(.title) else empty end);
+                (.children // [] | .[] | walk_nodes(.title))
+              else
+                empty
+              end;
 
-              .navigation | walk_nodes("Documentation")
+            .navigation[] | walk_nodes("Documentation")
             ' "$MANIFEST" | while read NODE; do
 
               FILE=$(echo "$NODE" | jq -r '.file')
