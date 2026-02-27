@@ -56,7 +56,10 @@ plugins:
 
 nav_collapsible: true
 
+mermaid:
+  version: "9.1.6"
 
+markdown: kramdown
 
 
 # Exclude from processing.
